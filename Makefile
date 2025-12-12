@@ -35,18 +35,26 @@ OBJS = $(SRCS:.c=.o)
 
 TARGET = xsysinfo
 
-.PHONY: all clean flexcat identify
+.PHONY: all clean identify
+
+# Detect platform for flexcat binary path
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    FLEXCAT_BIN = 3rdparty/flexcat/src/bin_darwin/flexcat
+else
+    FLEXCAT_BIN = 3rdparty/flexcat/src/bin_unix/flexcat
+endif
 
 all: identify $(TARGET)
 
-# FlexCat build
-flexcat:
+# FlexCat build - only when binary doesn't exist
+$(FLEXCAT_BIN):
 	$(MAKE) -C 3rdparty/flexcat bootstrap
-	$(MAKE)	-C 3rdparty/flexcat
+	$(MAKE) -C 3rdparty/flexcat
 
 # Identify library build (requires FlexCat)
-identify: flexcat
-	export PATH="$(CURDIR)/3rdparty/flexcat/src/bin_unix:$(PATH)" && \
+identify: $(FLEXCAT_BIN)
+	export PATH="$(CURDIR)/3rdparty/flexcat/src/bin_unix:$(CURDIR)/3rdparty/flexcat/src/bin_darwin:$(PATH)" && \
 	$(MAKE) -C 3rdparty/identify reference/proto/identify.h reference/inline/identify.h
 
 $(TARGET): $(OBJS)
