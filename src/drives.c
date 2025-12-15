@@ -835,3 +835,80 @@ void draw_drives_view(void)
     btn = find_button(BTN_DRV_SPEED);
     if (btn) draw_button(btn);
 }
+
+/*
+ * Update buttons for Drives view
+ */
+void drives_view_update_buttons(void)
+{
+    BOOL scsi_enabled = FALSE;
+    BOOL speed_enabled = FALSE;
+    ULONG i;
+    WORD y = 28;
+
+    /* Drive selection buttons */
+    for (i = 0; i < drive_list.count && i < 10; i++) {
+        add_button(10, y, 70, 12,
+                   drive_list.drives[i].device_name,
+                   (ButtonID)(BTN_DRV_DRIVE_BASE + i), TRUE);
+        y += 14;
+    }
+
+    /* Check capabilities of selected drive */
+    if (app->selected_drive >= 0 &&
+        app->selected_drive < (LONG)drive_list.count) {
+        DriveInfo *drive = &drive_list.drives[app->selected_drive];
+        scsi_enabled = drive->scsi_supported;
+        speed_enabled = (drive->disk_state != DISK_NO_DISK);
+    }
+
+    /* Action buttons */
+    add_button(100, 188, 52, 12,
+               get_string(MSG_BTN_SCSI), BTN_DRV_SCSI, scsi_enabled);
+    add_button(160, 188, 52, 12,
+               get_string(MSG_BTN_SPEED), BTN_DRV_SPEED, speed_enabled);
+    add_button(220, 188, 52, 12,
+               get_string(MSG_BTN_EXIT), BTN_DRV_EXIT, TRUE);
+}
+
+/*
+ * Handle button press for Drives view
+ */
+void drives_view_handle_button(ButtonID id)
+{
+    switch (id) {
+        case BTN_DRV_EXIT:
+            switch_to_view(VIEW_MAIN);
+            break;
+
+        case BTN_DRV_SCSI:
+            if (app->selected_drive >= 0 &&
+                app->selected_drive < (LONG)drive_list.count) {
+                DriveInfo *drive = &drive_list.drives[app->selected_drive];
+                scan_scsi_devices(drive->handler_name, drive->unit_number);
+                switch_to_view(VIEW_SCSI);
+            }
+            break;
+
+        case BTN_DRV_SPEED:
+            if (app->selected_drive >= 0 &&
+                app->selected_drive < (LONG)drive_list.count) {
+                show_status_overlay(get_string(MSG_MEASURING_SPEED));
+                measure_drive_speed(app->selected_drive);
+                hide_status_overlay();
+            }
+            break;
+
+        default:
+            /* Check for drive selection buttons */
+            if (id >= BTN_DRV_DRIVE_BASE &&
+                id < BTN_DRV_DRIVE_BASE + MAX_DRIVES) {
+                ULONG drive_index = id - BTN_DRV_DRIVE_BASE;
+                app->selected_drive = drive_index;
+                /* Check if disk is present when selecting a drive */
+                check_disk_present(drive_index);
+                redraw_current_view();
+            }
+            break;
+    }
+}

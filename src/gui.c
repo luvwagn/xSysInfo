@@ -52,9 +52,8 @@ static void draw_hardware_panel(void);
 static void draw_bottom_buttons(void);
 static void draw_cache_buttons(void);
 static void draw_cache_status(void);
-static void add_button(WORD x, WORD y, WORD w, WORD h,
-                       const char *label, ButtonID id, BOOL enabled);
 static void clear_buttons(void);
+static void update_software_list(void);
 
 void format_scaled(char *buffer, size_t size, ULONG value_x100)
 {
@@ -104,7 +103,7 @@ static void clear_buttons(void)
 /*
  * Add a button
  */
-static void add_button(WORD x, WORD y, WORD w, WORD h,
+void add_button(WORD x, WORD y, WORD w, WORD h,
                        const char *label, ButtonID id, BOOL enabled)
 {
     if (num_buttons >= MAX_BUTTONS) return;
@@ -166,6 +165,190 @@ void redraw_button(ButtonID id)
 }
 
 /*
+ * Update buttons for Main view
+ */
+void main_view_update_buttons(void)
+{
+    /* Bottom row buttons */
+    add_button(177, 176, 60, 11,
+               get_string(MSG_BTN_QUIT), BTN_QUIT, TRUE);
+    add_button(239, 176, 60, 11,
+               get_string(MSG_BTN_MEMORY), BTN_MEMORY, TRUE);
+    add_button(177, 187, 60, 11,
+               get_string(MSG_BTN_DRIVES), BTN_DRIVES, TRUE);
+    add_button(301, 176, 60, 11,
+               get_string(MSG_BTN_BOARDS), BTN_BOARDS, TRUE);
+    add_button(239, 187, 60, 11,
+               get_string(MSG_BTN_SPEED), BTN_SPEED, TRUE);
+    add_button(301, 187, 60, 11,
+               get_string(MSG_BTN_PRINT), BTN_PRINT, TRUE);
+
+    /* Software type cycle button */
+    add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 98,
+               SOFTWARE_PANEL_Y + 2, 92, 12,
+               app->software_type == SOFTWARE_LIBRARIES ?
+                   get_string(MSG_LIBRARIES) :
+               app->software_type == SOFTWARE_DEVICES ?
+                   get_string(MSG_DEVICES) :
+                   get_string(MSG_RESOURCES),
+               BTN_SOFTWARE_CYCLE, TRUE);
+
+    /* Software scroll buttons (arrows on right side) */
+    add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 14,
+               SOFTWARE_PANEL_Y + 15, 12, 10,
+               NULL, BTN_SOFTWARE_UP, TRUE);   /* Up arrow */
+    add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 14,
+               SOFTWARE_PANEL_Y + 15 + 10, 12, SOFTWARE_PANEL_H - 15 - 10 - 12,
+               NULL, BTN_SOFTWARE_SCROLLBAR, TRUE);  /* Scroll bar */
+    add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 14,
+               SOFTWARE_PANEL_Y + SOFTWARE_PANEL_H - 12 + 1, 12, 10,
+               NULL, BTN_SOFTWARE_DOWN, TRUE); /* Down arrow */
+
+    /* Scale toggle button */
+    add_button(SPEED_PANEL_X + SPEED_PANEL_W - 68,
+               SPEED_PANEL_Y + 2, 64, 12,
+               app->bar_scale == SCALE_SHRINK ?
+                   get_string(MSG_SHRINK) : get_string(MSG_EXPAND),
+               BTN_SCALE_TOGGLE, TRUE);
+
+    /* Cache buttons */
+    add_button(464, 176, 56, 11,
+               get_string(MSG_ICACHE), BTN_ICACHE, hw_info.has_icache);
+    add_button(464, 187, 56, 11,
+               get_string(MSG_DCACHE), BTN_DCACHE, hw_info.has_dcache);
+    add_button(522, 176, 56, 11,
+               get_string(MSG_IBURST), BTN_IBURST, hw_info.has_iburst);
+    add_button(522, 187, 56, 11,
+               get_string(MSG_DBURST), BTN_DBURST, hw_info.has_dburst);
+    add_button(580, 176, 56, 11,
+               get_string(MSG_CBACK), BTN_CBACK, hw_info.has_copyback);
+    add_button(580, 187, 56, 11,
+               get_string(MSG_BTN_ALL), BTN_ALL, hw_info.has_icache);
+}
+
+/*
+ * Handle button press for Main view
+ */
+void main_view_handle_button(ButtonID id)
+{
+    switch (id) {
+        case BTN_QUIT:
+            app->running = FALSE;
+            break;
+
+        case BTN_MEMORY:
+            switch_to_view(VIEW_MEMORY);
+            break;
+
+        case BTN_DRIVES:
+            switch_to_view(VIEW_DRIVES);
+            break;
+
+        case BTN_BOARDS:
+            switch_to_view(VIEW_BOARDS);
+            break;
+
+        case BTN_SPEED:
+            show_status_overlay(get_string(MSG_MEASURING_SPEED));
+            run_benchmarks();
+            hide_status_overlay();
+            break;
+
+        case BTN_PRINT:
+            {
+                char filename[MAX_FILENAME_LEN];
+                strncpy(filename, DEFAULT_OUTPUT_FILE, sizeof(filename) - 1);
+                filename[sizeof(filename) - 1] = '\0';
+
+                if (show_filename_requester(
+                        get_string(MSG_ENTER_FILENAME), filename, sizeof(filename))) {
+                    export_to_file(filename);
+                }
+            }
+            break;
+
+        case BTN_SOFTWARE_CYCLE:
+            app->software_type = (app->software_type + 1) % 3;
+            app->software_scroll = 0;
+            update_software_list();
+            break;
+
+        case BTN_SCALE_TOGGLE:
+            app->bar_scale = (app->bar_scale == SCALE_SHRINK) ?
+                             SCALE_EXPAND : SCALE_SHRINK;
+            redraw_current_view();
+            break;
+
+        case BTN_ICACHE:
+            toggle_icache();
+            refresh_cache_status();
+            draw_cache_status();
+            break;
+
+        case BTN_DCACHE:
+            toggle_dcache();
+            refresh_cache_status();
+            draw_cache_status();
+            break;
+
+        case BTN_IBURST:
+            toggle_iburst();
+            refresh_cache_status();
+            draw_cache_status();
+            break;
+
+        case BTN_DBURST:
+            toggle_dburst();
+            refresh_cache_status();
+            draw_cache_status();
+            break;
+
+        case BTN_CBACK:
+            toggle_copyback();
+            refresh_cache_status();
+            draw_cache_status();
+            break;
+
+        case BTN_ALL:
+            toggle_icache();
+            toggle_dcache();
+            toggle_iburst();
+            toggle_dburst();
+            toggle_copyback();
+            refresh_cache_status();
+            draw_cache_status();
+            break;
+
+        case BTN_SOFTWARE_UP:
+            if (app->software_scroll > 0) {
+                app->software_scroll--;
+                update_software_list();
+            }
+            break;
+
+        case BTN_SOFTWARE_DOWN:
+            {
+                SoftwareList *list = app->software_type == SOFTWARE_LIBRARIES ?
+                                         &libraries_list :
+                                     app->software_type == SOFTWARE_DEVICES ?
+                                         &devices_list : &resources_list;
+                if (app->software_scroll < (LONG)list->count - SOFTWARE_LIST_LINES) {
+                    app->software_scroll++;
+                    update_software_list();
+                }
+            }
+            break;
+
+        case BTN_SOFTWARE_SCROLLBAR:
+            /* Scrollbar clicking is handled specially in handle_scrollbar_click */
+            break;
+
+        default:
+            break;
+    }
+}
+
+/*
  * Update button states based on current view and hardware
  */
 void update_button_states(void)
@@ -174,120 +357,23 @@ void update_button_states(void)
 
     switch (app->current_view) {
         case VIEW_MAIN:
-            /* Bottom row buttons */
-            add_button(177, 176, 60, 11,
-                       get_string(MSG_BTN_QUIT), BTN_QUIT, TRUE);
-            add_button(239, 176, 60, 11,
-                       get_string(MSG_BTN_MEMORY), BTN_MEMORY, TRUE);
-            add_button(177, 187, 60, 11,
-                       get_string(MSG_BTN_DRIVES), BTN_DRIVES, TRUE);
-            add_button(301, 176, 60, 11,
-                       get_string(MSG_BTN_BOARDS), BTN_BOARDS, TRUE);
-            add_button(239, 187, 60, 11,
-                       get_string(MSG_BTN_SPEED), BTN_SPEED, TRUE);
-            add_button(301, 187, 60, 11,
-                       get_string(MSG_BTN_PRINT), BTN_PRINT, TRUE);
-
-            /* Software type cycle button */
-            add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 98,
-                       SOFTWARE_PANEL_Y + 2, 92, 12,
-                       app->software_type == SOFTWARE_LIBRARIES ?
-                           get_string(MSG_LIBRARIES) :
-                       app->software_type == SOFTWARE_DEVICES ?
-                           get_string(MSG_DEVICES) :
-                           get_string(MSG_RESOURCES),
-                       BTN_SOFTWARE_CYCLE, TRUE);
-
-            /* Software scroll buttons (arrows on right side) */
-            add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 14,
-                       SOFTWARE_PANEL_Y + 15, 12, 10,
-                       NULL, BTN_SOFTWARE_UP, TRUE);   /* Up arrow */
-            add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 14,
-                       SOFTWARE_PANEL_Y + 15 + 10, 12, SOFTWARE_PANEL_H - 15 - 10 - 12,
-                       NULL, BTN_SOFTWARE_SCROLLBAR, TRUE);  /* Scroll bar */
-            add_button(SOFTWARE_PANEL_X + SOFTWARE_PANEL_W - 14,
-                       SOFTWARE_PANEL_Y + SOFTWARE_PANEL_H - 12 + 1, 12, 10,
-                       NULL, BTN_SOFTWARE_DOWN, TRUE); /* Down arrow */
-
-            /* Scale toggle button */
-            add_button(SPEED_PANEL_X + SPEED_PANEL_W - 68,
-                       SPEED_PANEL_Y + 2, 64, 12,
-                       app->bar_scale == SCALE_SHRINK ?
-                           get_string(MSG_SHRINK) : get_string(MSG_EXPAND),
-                       BTN_SCALE_TOGGLE, TRUE);
-
-            /* Cache buttons */
-            add_button(464, 176, 56, 11,
-                       get_string(MSG_ICACHE), BTN_ICACHE, hw_info.has_icache);
-            add_button(464, 187, 56, 11,
-                       get_string(MSG_DCACHE), BTN_DCACHE, hw_info.has_dcache);
-            add_button(522, 176, 56, 11,
-                       get_string(MSG_IBURST), BTN_IBURST, hw_info.has_iburst);
-            add_button(522, 187, 56, 11,
-                       get_string(MSG_DBURST), BTN_DBURST, hw_info.has_dburst);
-            add_button(580, 176, 56, 11,
-                       get_string(MSG_CBACK), BTN_CBACK, hw_info.has_copyback);
-            add_button(580, 187, 56, 11,
-                       get_string(MSG_BTN_ALL), BTN_ALL, hw_info.has_icache);
+            main_view_update_buttons();
             break;
 
         case VIEW_MEMORY:
-            {
-                static char counter_str[16];
-                snprintf(counter_str, sizeof(counter_str), "%" PRId32 " / %lu",
-                         app->memory_region_index + 1, (unsigned long)memory_regions.count);
-                add_button(100, 188, 52, 12,
-                           get_string(MSG_BTN_PREV), BTN_MEM_PREV,
-                           app->memory_region_index > 0);
-                add_button(160, 188, 52, 12,
-                           counter_str, BTN_MEM_COUNTER, FALSE);
-                add_button(220, 188, 52, 12,
-                           get_string(MSG_BTN_NEXT), BTN_MEM_NEXT,
-                           app->memory_region_index < (LONG)memory_regions.count - 1);
-                add_button(280, 188, 52, 12,
-                           get_string(MSG_BTN_SPEED), BTN_MEM_SPEED, TRUE);
-                add_button(340, 188, 52, 12,
-                           get_string(MSG_BTN_EXIT), BTN_MEM_EXIT, TRUE);
-            }
+            memory_view_update_buttons();
             break;
 
         case VIEW_DRIVES:
-            {
-                BOOL scsi_enabled = FALSE;
-                BOOL speed_enabled = FALSE;
-
-                ULONG i;
-                WORD y = 28;
-                for (i = 0; i < drive_list.count && i < 10; i++) {
-                    add_button(10, y, 70, 12,
-                               drive_list.drives[i].device_name,
-                               (ButtonID)(BTN_DRV_DRIVE_BASE + i), TRUE);
-                    y += 14;
-                }
-
-                if (app->selected_drive >= 0 &&
-                    app->selected_drive < (LONG)drive_list.count) {
-                    DriveInfo *drive = &drive_list.drives[app->selected_drive];
-                    scsi_enabled = drive->scsi_supported;
-                    speed_enabled = (drive->disk_state != DISK_NO_DISK);
-                }
-                add_button(100, 188, 52, 12,
-                           get_string(MSG_BTN_SCSI), BTN_DRV_SCSI, scsi_enabled);
-                add_button(160, 188, 52, 12,
-                           get_string(MSG_BTN_SPEED), BTN_DRV_SPEED, speed_enabled);
-                add_button(220, 188, 52, 12,
-                           get_string(MSG_BTN_EXIT), BTN_DRV_EXIT, TRUE);
-            }
+            drives_view_update_buttons();
             break;
 
         case VIEW_BOARDS:
-            add_button(20, 188, 60, 12,
-                       get_string(MSG_BTN_EXIT), BTN_BOARD_EXIT, TRUE);
+            boards_view_update_buttons();
             break;
 
         case VIEW_SCSI:
-            add_button(20, 188, 60, 12,
-                       get_string(MSG_BTN_EXIT), BTN_SCSI_EXIT, TRUE);
+            scsi_view_update_buttons();
             break;
     }
 }
@@ -1220,179 +1306,25 @@ ButtonID handle_click(WORD mx, WORD my)
  */
 void handle_button_press(ButtonID btn_id)
 {
-    switch (btn_id) {
-        case BTN_QUIT:
-            app->running = FALSE;
+    switch (app->current_view) {
+        case VIEW_MAIN:
+            main_view_handle_button(btn_id);
             break;
 
-        case BTN_MEMORY:
-            switch_to_view(VIEW_MEMORY);
+        case VIEW_MEMORY:
+            memory_view_handle_button(btn_id);
             break;
 
-        case BTN_DRIVES:
-            switch_to_view(VIEW_DRIVES);
+        case VIEW_DRIVES:
+            drives_view_handle_button(btn_id);
             break;
 
-        case BTN_BOARDS:
-            switch_to_view(VIEW_BOARDS);
+        case VIEW_BOARDS:
+            boards_view_handle_button(btn_id);
             break;
 
-        case BTN_SPEED:
-            show_status_overlay(get_string(MSG_MEASURING_SPEED));
-            run_benchmarks();
-            hide_status_overlay();
-            break;
-
-        case BTN_PRINT:
-            {
-                char filename[MAX_FILENAME_LEN];
-                strncpy(filename, DEFAULT_OUTPUT_FILE, sizeof(filename) - 1);
-                filename[sizeof(filename) - 1] = '\0';
-
-                if (show_filename_requester(
-                        get_string(MSG_ENTER_FILENAME), filename, sizeof(filename))) {
-                    export_to_file(filename);
-                }
-            }
-            break;
-
-        case BTN_SOFTWARE_CYCLE:
-            app->software_type = (app->software_type + 1) % 3;
-            app->software_scroll = 0;
-            update_software_list();
-            break;
-
-        case BTN_SCALE_TOGGLE:
-            app->bar_scale = (app->bar_scale == SCALE_SHRINK) ?
-                             SCALE_EXPAND : SCALE_SHRINK;
-            redraw_current_view();
-            break;
-
-        case BTN_ICACHE:
-            toggle_icache();
-            refresh_cache_status();
-            draw_cache_status();
-            break;
-
-        case BTN_DCACHE:
-            toggle_dcache();
-            refresh_cache_status();
-            draw_cache_status();
-            break;
-
-        case BTN_IBURST:
-            toggle_iburst();
-            refresh_cache_status();
-            draw_cache_status();
-            break;
-
-        case BTN_DBURST:
-            toggle_dburst();
-            refresh_cache_status();
-            draw_cache_status();
-            break;
-
-        case BTN_CBACK:
-            toggle_copyback();
-            refresh_cache_status();
-            draw_cache_status();
-            break;
-
-        case BTN_ALL:
-            toggle_icache();
-            toggle_dcache();
-            toggle_iburst();
-            toggle_dburst();
-            toggle_copyback();
-            refresh_cache_status();
-            draw_cache_status();
-            break;
-
-        case BTN_MEM_PREV:
-            if (app->memory_region_index > 0) {
-                app->memory_region_index--;
-                redraw_current_view();
-            }
-            break;
-
-        case BTN_MEM_NEXT:
-            if (app->memory_region_index < (LONG)memory_regions.count - 1) {
-                app->memory_region_index++;
-                redraw_current_view();
-            }
-            break;
-
-        case BTN_MEM_SPEED:
-            if (app->memory_region_index >= 0 &&
-                app->memory_region_index < (LONG)memory_regions.count) {
-                show_status_overlay(get_string(MSG_MEASURING_SPEED));
-                measure_memory_speed(app->memory_region_index);
-                hide_status_overlay();
-            }
-            break;
-
-        case BTN_SOFTWARE_UP:
-            if (app->software_scroll > 0) {
-                app->software_scroll--;
-                update_software_list();
-            }
-            break;
-
-        case BTN_SOFTWARE_DOWN:
-            {
-                SoftwareList *list = app->software_type == SOFTWARE_LIBRARIES ?
-                                         &libraries_list :
-                                     app->software_type == SOFTWARE_DEVICES ?
-                                         &devices_list : &resources_list;
-                if (app->software_scroll < (LONG)list->count - SOFTWARE_LIST_LINES) {
-                    app->software_scroll++;
-                    update_software_list();
-                }
-            }
-            break;
-
-        case BTN_SOFTWARE_SCROLLBAR:
-            /* Scrollbar clicking is handled specially in handle_scrollbar_click */
-            break;
-
-        case BTN_MEM_EXIT:
-        case BTN_DRV_EXIT:
-        case BTN_BOARD_EXIT:
-            switch_to_view(VIEW_MAIN);
-            break;
-
-        case BTN_SCSI_EXIT:
-            switch_to_view(VIEW_DRIVES);
-            break;
-
-        case BTN_DRV_SCSI:
-            if (app->selected_drive >= 0 &&
-                app->selected_drive < (LONG)drive_list.count) {
-                DriveInfo *drive = &drive_list.drives[app->selected_drive];
-                scan_scsi_devices(drive->handler_name, drive->unit_number);
-                switch_to_view(VIEW_SCSI);
-            }
-            break;
-
-        case BTN_DRV_SPEED:
-            if (app->selected_drive >= 0 &&
-                app->selected_drive < (LONG)drive_list.count) {
-                show_status_overlay(get_string(MSG_MEASURING_SPEED));
-                measure_drive_speed(app->selected_drive);
-                hide_status_overlay();
-            }
-            break;
-
-        default:
-            /* Check for drive selection buttons */
-            if (btn_id >= BTN_DRV_DRIVE_BASE &&
-                btn_id < BTN_DRV_DRIVE_BASE + MAX_DRIVES) {
-                ULONG drive_index = btn_id - BTN_DRV_DRIVE_BASE;
-                app->selected_drive = drive_index;
-                /* Check if disk is present when selecting a drive */
-                check_disk_present(drive_index);
-                redraw_current_view();
-            }
+        case VIEW_SCSI:
+            scsi_view_handle_button(btn_id);
             break;
     }
 }

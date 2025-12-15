@@ -339,3 +339,63 @@ void draw_memory_view(void)
     btn = find_button(BTN_MEM_EXIT);
     if (btn) draw_button(btn);
 }
+
+/*
+ * Update buttons for Memory view
+ */
+void memory_view_update_buttons(void)
+{
+    static char counter_str[16];
+    snprintf(counter_str, sizeof(counter_str), "%" PRId32 " / %lu",
+             app->memory_region_index + 1, (unsigned long)memory_regions.count);
+    add_button(100, 188, 52, 12,
+               get_string(MSG_BTN_PREV), BTN_MEM_PREV,
+               app->memory_region_index > 0);
+    add_button(160, 188, 52, 12,
+               counter_str, BTN_MEM_COUNTER, FALSE);
+    add_button(220, 188, 52, 12,
+               get_string(MSG_BTN_NEXT), BTN_MEM_NEXT,
+               app->memory_region_index < (LONG)memory_regions.count - 1);
+    add_button(280, 188, 52, 12,
+               get_string(MSG_BTN_SPEED), BTN_MEM_SPEED, TRUE);
+    add_button(340, 188, 52, 12,
+               get_string(MSG_BTN_EXIT), BTN_MEM_EXIT, TRUE);
+}
+
+/*
+ * Handle button press for Memory view
+ */
+void memory_view_handle_button(ButtonID id)
+{
+    switch (id) {
+        case BTN_MEM_PREV:
+            if (app->memory_region_index > 0) {
+                app->memory_region_index--;
+                redraw_current_view();
+            }
+            break;
+
+        case BTN_MEM_NEXT:
+            if (app->memory_region_index < (LONG)memory_regions.count - 1) {
+                app->memory_region_index++;
+                redraw_current_view();
+            }
+            break;
+
+        case BTN_MEM_SPEED:
+            if (app->memory_region_index >= 0 &&
+                app->memory_region_index < (LONG)memory_regions.count) {
+                show_status_overlay(get_string(MSG_MEASURING_SPEED));
+                measure_memory_speed(app->memory_region_index);
+                hide_status_overlay();
+            }
+            break;
+
+        case BTN_MEM_EXIT:
+            switch_to_view(VIEW_MAIN);
+            break;
+
+        default:
+            break;
+    }
+}

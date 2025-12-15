@@ -599,3 +599,22 @@ void draw_scsi_view(void)
     btn = find_button(BTN_SCSI_EXIT);
     if (btn) draw_button(btn);
 }
+
+/*
+ * Update buttons for SCSI view
+ */
+void scsi_view_update_buttons(void)
+{
+    add_button(20, 188, 60, 12,
+               get_string(MSG_BTN_EXIT), BTN_SCSI_EXIT, TRUE);
+}
+
+/*
+ * Handle button press for SCSI view
+ */
+void scsi_view_handle_button(ButtonID id)
+{
+    if (id == BTN_SCSI_EXIT) {
+        switch_to_view(VIEW_DRIVES);
+    }
+}

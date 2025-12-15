@@ -215,3 +215,22 @@ void draw_boards_view(void)
     Button *btn = find_button(BTN_BOARD_EXIT);
     if (btn) draw_button(btn);
 }
+
+/*
+ * Update buttons for Boards view
+ */
+void boards_view_update_buttons(void)
+{
+    add_button(20, 188, 60, 12,
+               get_string(MSG_BTN_EXIT), BTN_BOARD_EXIT, TRUE);
+}
+
+/*
+ * Handle button press for Boards view
+ */
+void boards_view_handle_button(ButtonID id)
+{
+    if (id == BTN_BOARD_EXIT) {
+        switch_to_view(VIEW_MAIN);
+    }
+}

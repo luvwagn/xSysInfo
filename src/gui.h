@@ -146,6 +146,7 @@ void handle_scrollbar_click(WORD mx, WORD my);
 /* Button state management */
 void init_buttons(void);
 void update_button_states(void);
+void add_button(WORD x, WORD y, WORD w, WORD h, const char *label, ButtonID id, BOOL enabled);
 Button *find_button(ButtonID id);
 void set_button_pressed(ButtonID id, BOOL pressed);
 void redraw_button(ButtonID id);
@@ -159,5 +160,21 @@ BOOL show_filename_requester(const char *title, char *filename, ULONG filename_s
 /* Status overlay (no input, just display) */
 void show_status_overlay(const char *message);
 void hide_status_overlay(void);
+
+/* View Controller Prototypes */
+void main_view_update_buttons(void);
+void main_view_handle_button(ButtonID id);
+
+void memory_view_update_buttons(void);
+void memory_view_handle_button(ButtonID id);
+
+void drives_view_update_buttons(void);
+void drives_view_handle_button(ButtonID id);
+
+void boards_view_update_buttons(void);
+void boards_view_handle_button(ButtonID id);
+
+void scsi_view_update_buttons(void);
+void scsi_view_handle_button(ButtonID id);
 
 #endif /* GUI_H */
