@@ -547,6 +547,25 @@ ULONG measure_drive_speed(ULONG index)
           (LONG)drive->handler_name, (LONG)drive->unit_number,
           (LONG)num_reads, (LONG)buffer_size, (LONG)read_offset);
 
+    /* Warm up floppy by doing an untimed read to get the head on track */
+    if (is_floppy) {
+        io->io_Command = CMD_READ;
+        io->io_Data = buffer;
+        io->io_Length = buffer_size;
+        io->io_Offset = read_offset;
+
+        error = DoIO((struct IORequest *)io);
+        if (error != 0) {
+            debug("  drives: Warm-up read error %ld\n", (LONG)error);
+            FreeMem(buffer, buffer_size);
+            CloseDevice((struct IORequest *)io);
+            WaitTOF();
+            DeleteIORequest((struct IORequest *)io);
+            DeleteMsgPort(port);
+            return 0;
+        }
+    }
+
     /* Get start time */
     start_time = get_timer_ticks();
 
