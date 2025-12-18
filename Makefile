@@ -47,7 +47,7 @@ OBJS = $(SRCS:.c=.o)
 
 TARGET = xSysInfo
 
-.PHONY: all clean identify
+.PHONY: all clean identify catalogs
 
 # Detect platform for flexcat binary path
 UNAME_S := $(shell uname -s)
@@ -74,6 +74,21 @@ identify: $(FLEXCAT_BIN)
 	export PATH="$(CURDIR)/3rdparty/flexcat/src/bin_unix:$(CURDIR)/3rdparty/flexcat/src/bin_darwin:$(PATH)" && \
 	$(MAKE) -s -C 3rdparty/identify reference/proto/identify.h reference/inline/identify.h
 
+# Catalog definitions - maps source directory to AmigaOS language name
+CATALOG_DESC = catalogs/xSysInfo.cd
+CATALOG_DIR = catalogs/build
+CATALOG_LANGS = german:deutsch french:français turkish:türkçe polish:polski
+
+# Build all catalogs
+catalogs: $(FLEXCAT_BIN)
+	@for mapping in $(CATALOG_LANGS); do \
+		src=$${mapping%%:*}; \
+		lang=$${mapping##*:}; \
+		mkdir -p "$(CATALOG_DIR)/$$lang"; \
+		echo "  CATALOG $$lang"; \
+		$(FLEXCAT_BIN) $(CATALOG_DESC) "catalogs/$$src/xSysInfo.ct" CATALOG "$(CATALOG_DIR)/$$lang/xSysInfo.catalog"; \
+	done
+
 $(TARGET): $(OBJS)
 	@echo "  LINK  $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
@@ -88,6 +103,7 @@ src/%.o: src/%.c src/xsysinfo.h
 clean:
 	@echo "  CLEAN"
 	@rm -f $(OBJS) $(TARGET) TinySetPatch
+	@rm -rf $(CATALOG_DIR)
 	@$(MAKE) -s -C 3rdparty/flexcat clean
 	@$(MAKE) -s -C 3rdparty/identify clean
 
